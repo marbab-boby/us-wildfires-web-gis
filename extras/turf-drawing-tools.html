@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    
+
+    <!-- leaflet css  -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel= "stylesheet" href="https://unpkg.com/leaflet.pm@latest/dist/leaflet.pm.css"/>
+	
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+</body>
+
+</html>
+
+<!-- leaflet js  -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.pm@latest/dist/leaflet.pm.min.js">   </script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@5/turf.min.js"></script>
+
+
+
+
+<script>
+    // Map initialization 
+    var map = L.map('map').setView([28.3949, 84.1240], 1);
+
+    
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+    osm.addTo(map);
+	
+	
+var options ={
+	position:'topleft',
+	drawMarker:true,
+	drawPolyline:true,
+	drawRectangle:true,
+	drawPolygon:true,
+	drawCircle:true,
+	cutPolygon:true,
+	editMode:true,
+	removalMode:true,
+	
+	};
+	
+	map.pm.addControls(options);
+
+
+    //bbox
+	var line = turf.lineString([[-74, 40], [-78, 42], [-82, 35]]);
+	var bbox = turf.bbox(line);
+	var bboxPolygon = turf.bboxPolygon(bbox);
+
+	L.geoJSON(bboxPolygon).addTo(map); 
+ 
+	//pointonfeature
+	var polygon = turf.polygon([[
+	  [116, -36],
+	  [131, -32],
+	  [146, -43],
+	  [155, -25],
+	  [133, -9],
+	  [111, -22],
+	  [116, -36]
+	]]);
+
+	var pointOnPolygon = turf.pointOnFeature(polygon);	
+	L.geoJSON(pointOnPolygon).addTo(map);
+	
+	//Turf creating geometry (GeoJSON)
+    var point = turf.multiPoint([[84.1240, 28.3949], [83.1240, 29.3949]])
+    L.geoJSON(point).addTo(map);
+	
+	// buffer
+	var point = turf.point([-90.548630, 14.616599]);
+	var buffered = turf.buffer(point, 500, {units: 'miles'});
+    L.geoJSON(buffered).addTo(map);
+
+
+   //circle
+	var center = [30, 69];
+	var radius = 5;
+	var options = {steps: 10, units: 'kilometers', properties: {foo: 'bar'}};
+	var circle = turf.circle(center, radius, options);
+    L.geoJSON(circle).addTo(map);
+	
+	//concave
+	var points = turf.featureCollection([
+	  turf.point([-63.601226, 44.642643]),
+	  turf.point([-63.591442, 44.651436]),
+	  turf.point([-63.580799, 44.648749]),
+	  turf.point([-63.573589, 44.641788]),
+	  turf.point([-63.587665, 44.64533]),
+	  turf.point([-64.587665, 45.64533]),
+	  turf.point([-63.595218, 44.64765])
+	]);
+	var options = {units: 'miles', maxEdge: 1};
+
+	var hull = turf.concave(points, options);
+	L.geoJSON(hull).addTo(map);
+	
+	
+	//convex
+	var points = turf.featureCollection([
+	  turf.point([10.195312, 43.755225]),
+	  turf.point([10.404052, 43.8424511]),
+	  turf.point([10.579833, 43.659924]),
+	  turf.point([10.360107, 43.516688]),
+	  turf.point([10.14038, 43.588348]),
+	  turf.point([10.195312, 43.755225])
+	]);
+
+	var hull_1 = turf.convex(points);
+	
+	
+	L.geoJSON(hull_1).addTo(map);
+	
+	
+	//difference
+	var polygon1 = turf.polygon([[
+	  [128, -26],
+	  [141, -26],
+	  [141, -21],
+	  [128, -21],
+	  [128, -26]
+	]], {
+	  "fill": "#F00",
+	  "fill-opacity": 0.1
+	});
+	var polygon2 = turf.polygon([[
+	  [126, -28],
+	  [140, -28],
+	  [140, -20],
+	  [126, -20],
+	  [126, -28]
+	]], {
+	  "fill": "#00F",
+	  "fill-opacity": 0.1
+	});
+
+	var difference = turf.difference(polygon1, polygon2);
+	L.geoJSON(difference).addTo(map);
+
+
+	//disolve
+	var features = turf.featureCollection([
+	  turf.polygon([[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]], {combine: 'yes'}),
+	  turf.polygon([[[0, -1], [0, 0], [1, 0], [1, -1], [0,-1]]], {combine: 'yes'}),
+	  turf.polygon([[[1,-1],[1, 0], [2, 0], [2, -1], [1, -1]]], {combine: 'no'}),
+	]);
+
+	var dissolved = turf.dissolve(features, {propertyName: 'combine'});
+    L.geoJSON(dissolved).addTo(map);
+	
+	
+	//intersect
+	var poly1 = turf.polygon([[
+	  [-122.801742, 45.48565],
+	  [-122.801742, 45.60491],
+	  [-122.584762, 45.60491],
+	  [-122.584762, 45.48565],
+	  [-122.801742, 45.48565]
+	]]);
+
+	var poly2 = turf.polygon([[
+	  [-122.520217, 45.535693],
+	  [-122.64038, 45.553967],
+	  [-122.720031, 45.526554],
+	  [-122.669906, 45.507309],
+	  [-122.723464, 45.446643],
+	  [-122.532577, 45.408574],
+	  [-122.487258, 45.477466],
+	  [-122.520217, 45.535693]
+	]]);
+
+	var intersection = turf.intersect(poly1, poly2);
+    L.geoJSON(intersection).addTo(map);
+	
+	
+	
+	//\Simplified
+	var geojson = turf.polygon([[
+	  [-70.603637, -33.399918],
+	  [-70.614624, -33.395332],
+	  [-70.639343, -33.392466],
+	  [-70.659942, -33.394759],
+	  [-70.683975, -33.404504],
+	  [-70.697021, -33.419406],
+	  [-70.701141, -33.434306],
+	  [-70.700454, -33.446339],
+	  [-70.694274, -33.458369],
+	  [-70.682601, -33.465816],
+	  [-70.668869, -33.472117],
+	  [-70.646209, -33.473835],
+	  [-70.624923, -33.472117],
+	  [-70.609817, -33.468107],
+	  [-70.595397, -33.458369],
+	  [-70.587158, -33.442901],
+	  [-70.587158, -33.426283],
+	  [-70.590591, -33.414248],
+	  [-70.594711, -33.406224],
+	  [-70.603637, -33.399918]
+	]]);
+	var options = {tolerance: 0.01, highQuality: false};
+	var simplified = turf.simplify(geojson, options);
+    L.geoJSON(simplified).addTo(map);
+	
+	//Transform Rotation
+	var poly = turf.polygon([[[0,29],[3.5,29],[2.5,32],[0,29]]]);
+	var options = {pivot: [0, 25]};
+	var rotatedPoly = turf.transformRotate(poly, 10, options);
+	L.geoJSON(rotatedPoly).addTo(map);
+    
+
+/*
+    //Transform Scale
+	var poly = turf.polygon([[[0,29],[3.5,29],[2.5,32],[0,29]]]);
+	var scaledPoly = turf.transformScale(poly, 3);
+	L.geoJSON(scaledPoly).addTo(map);
+	 */
+	 
+	 
+	 
+    //Union
+	var poly1 = turf.polygon([[
+		[-82.574787, 35.594087],
+		[-82.574787, 35.615581],
+		[-82.545261, 35.615581],
+		[-82.545261, 35.594087],
+		[-82.574787, 35.594087]
+	]], {"fill": "#0f0"});
+	var poly2 = turf.polygon([[
+		[-82.560024, 35.585153],
+		[-82.560024, 35.602602],
+		[-82.52964, 35.602602],
+		[-82.52964, 35.585153],
+		[-82.560024, 35.585153]
+	]], {"fill": "#00f"});
+
+	var union = turf.union(poly1, poly2);
+	L.geoJSON(union).addTo(map);
+	
+	
+	//Voronoi
+	var options = {
+	  bbox: [39, 40, 104, 60]
+	};
+	var points = turf.randomPoint(100, options);
+	var voronoiPolygons = turf.voronoi(points, options);
+	L.geoJSON(voronoiPolygons).addTo(map);
+
+    //Line to polygon
+	var line = turf.lineString([[125, -30], [145, -30], [145, -20], [125, -20], [125, -30]]);
+
+	var polygon = turf.lineToPolygon(line);
+	L.geoJSON(polygon).addTo(map);
+
+
+	//Ellipse 
+	var center = [23, 45];
+	var xSemiAxis = 25;
+	var ySemiAxis = 12;
+	var ellipse = turf.ellipse(center, xSemiAxis, ySemiAxis);
+	L.geoJSON(ellipse).addTo(map);
+
+    //Line ARc
+	var center = turf.point([19, 64]);
+	var radius = 55;
+	var bearing1 = 25;
+	var bearing2 = 47;
+	var arc = turf.lineArc(center, radius, bearing1, bearing2);
+	L.geoJSON(arc).addTo(map);
+	
+	//line overlay
+	var line1 = turf.lineString([[126, -11], [129, -21]]);
+	var line2 = turf.lineString([[123, -18], [131, -14]]);
+	var intersects = turf.lineIntersect(line1, line2);
+	L.geoJSON(line1).addTo(map);
+	L.geoJSON(line2).addTo(map);	
+	L.geoJSON(intersects).addTo(map);
+
+    //HEx Grid
+	var bbox = [-96,31,-84,40];
+	var cellSide = 50;
+	var options = {units: 'miles'};
+
+	var hexgrid = turf.hexGrid(bbox, cellSide, options);
+	L.geoJSON(hexgrid).addTo(map);
+	
+	
+	/*
+	//Square Grid
+	var bbox = [-95, 30 ,-85, 40];
+	var cellSide = 50;
+	var options = {units: 'miles'};
+
+	var squareGrid = turf.squareGrid(bbox, cellSide, options);
+	L.geoJSON(squareGrid).addTo(map);
+	*/
+	
+	
+	
+
+</script>

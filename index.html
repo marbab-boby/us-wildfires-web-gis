@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>US Wildfires 2005–2020 · Web GIS</title>
+  <meta name="description" content="Interactive heatmap of MTBS wildfires in the United States (2005–2020) compared with MODIS NDVI vegetation." />
+  <link rel="icon" type="image/png" href="favicon/fire.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --ink: #14181f;
+      --ink-2: #4a5361;
+      --ink-3: #7a8494;
+      --line: #e3e6eb;
+      --header: #12151b;
+      --accent: #e8590c;
+      --accent-soft: #fff1e8;
+      --wild: #e8590c;
+      --presc: #2f80c2;
+      --wfu: #8a5cc2;
+      --unk: #9aa3af;
+      --radius: 12px;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 16px rgba(16, 24, 40, .06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---------- Header ---------- */
+    .site-header {
+      background: var(--header);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 36px; height: 36px; border-radius: 9px;
+      background: linear-gradient(135deg, #ffb347, #e8590c 55%, #b02a07);
+      display: grid; place-items: center; flex: none;
+    }
+    .brand h1 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+    .brand p { margin: 0; font-size: 13px; color: #a9b1bd; }
+    .header-links { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    .header-links a {
+      color: #d6dbe3; font-size: 13px; font-weight: 500;
+      padding: 7px 12px; border: 1px solid #2c323c; border-radius: 8px;
+    }
+    .header-links a:hover { background: #1f242c; text-decoration: none; color: #fff; }
+
+    /* ---------- Layout ---------- */
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; }
+    .map-grid {
+      display: grid;
+      grid-template-columns: 330px minmax(0, 1fr);
+      gap: 16px;
+      height: min(calc(100vh - 104px), 820px);
+      min-height: 560px;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .sidebar { padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+    .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px;
+    }
+
+    /* Year selector */
+    .year-row { display: flex; gap: 8px; align-items: stretch; }
+    .segmented {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      background: #eef0f3; border-radius: 9px; padding: 3px; flex: 1;
+    }
+    .segmented button {
+      border: 0; background: transparent; font: inherit; font-weight: 600; font-size: 14px;
+      color: var(--ink-2); padding: 7px 0; border-radius: 7px; cursor: pointer;
+    }
+    .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .icon-btn {
+      width: 40px; border: 1px solid var(--line); background: var(--surface); border-radius: 9px;
+      cursor: pointer; display: grid; place-items: center; color: var(--ink-2);
+    }
+    .icon-btn:hover { background: #f7f8fa; }
+    .icon-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* KPIs */
+    .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+    .kpi .label { font-size: 12px; color: var(--ink-3); }
+    .kpi .value { font-size: 22px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .kpi .unit { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+
+    /* Fire type breakdown */
+    .stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #eef0f3; }
+    .stack span { display: block; height: 100%; transition: width .4s ease; }
+    .types { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; }
+    .types li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .types label { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; }
+    .types input { margin: 0; accent-color: var(--accent); }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+    .types .n { margin-left: auto; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+    /* Trend bars */
+    .trend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; align-items: end; height: 92px; }
+    .trend .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; cursor: pointer; }
+    .trend .bar { width: 100%; max-width: 44px; background: #f3c9ae; border-radius: 4px 4px 0 0; transition: height .4s ease, background .2s; }
+    .trend .bar-col.active .bar { background: var(--accent); }
+    .trend .bar-val { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .trend .bar-yr { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .switch { position: relative; width: 38px; height: 22px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; inset: 0; background: #cfd4db; border-radius: 22px; cursor: pointer; transition: .2s; }
+    .switch .track::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: var(--accent); }
+    .switch input:checked + .track::before { transform: translateX(16px); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .note { font-size: 12px; color: var(--ink-3); margin: 0; }
+
+    /* Map */
+    .map-wrap { position: relative; overflow: hidden; }
+    #map { position: absolute; inset: 0; border-radius: var(--radius); background: #1b1e24; }
+    .map-badge {
+      position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 500;
+      background: rgba(18, 21, 27, .85); color: #fff; backdrop-filter: blur(6px);
+      padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; pointer-events: none;
+    }
+    .legend {
+      background: rgba(255, 255, 255, .95); padding: 10px 12px; border-radius: 10px;
+      box-shadow: var(--shadow); font: 12px "Inter", sans-serif; color: var(--ink-2); width: 200px;
+    }
+    .legend .ramp { height: 10px; border-radius: 5px; margin: 6px 0 4px;
+      background: linear-gradient(90deg, rgba(0,0,255,.35), #00e5ff 25%, #36d14c 50%, #ffe100 75%, #ff2a00); }
+    .legend .ends { display: flex; justify-content: space-between; color: var(--ink-3); }
+    .legend strong { color: var(--ink); font-weight: 600; }
+    .leaflet-popup-content { font: 13px/1.5 "Inter", sans-serif; margin: 12px 14px; }
+    .leaflet-popup-content b { font-weight: 600; }
+    .leaflet-container { font-family: "Inter", sans-serif; }
+
+    /* ---------- Content sections ---------- */
+    section.block { margin-top: 28px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .section-head h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+    .section-head p { margin: 4px 0 0; color: var(--ink-2); max-width: 720px; }
+    .ndvi-card { padding: 18px; }
+    .ndvi-tabs { display: inline-grid; grid-template-columns: repeat(4, auto); flex: none; }
+    .ndvi-tabs button { padding: 7px 16px; }
+    .ndvi-figure { margin: 0; }
+    .ndvi-figure img { display: block; width: 100%; height: auto; border-radius: 8px; }
+    .ndvi-figure figcaption { font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+
+    .findings { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .finding { padding: 18px; }
+    .finding .num { width: 28px; height: 28px; border-radius: 8px; background: var(--accent-soft); color: var(--accent);
+      display: grid; place-items: center; font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+    .finding h3 { margin: 0 0 6px; font-size: 16px; }
+    .finding p { margin: 0; color: var(--ink-2); font-size: 14px; }
+
+    .site-footer { border-top: 1px solid var(--line); margin-top: 36px; padding-top: 18px;
+      display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-3); }
+    .site-footer p { margin: 0; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 900px) {
+      .wrap { padding: 16px 16px 32px; }
+      .map-grid { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+      .map-wrap { height: min(65vh, 520px); min-height: 380px; order: -1; }
+      .findings { grid-template-columns: 1fr; }
+      .header-links { margin-left: 0; }
+      .site-header { padding: 12px 16px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M13.5 1.5s.9 3.1-1.3 6.1c-1.3 1.8-3.7 3.4-3.7 6.9 0 0-1.6-.8-1.9-3.1C4.6 13.3 4 15.4 4 17a8 8 0 0 0 16 0c0-6.2-5-8.6-6.5-15.5zM12 22a4 4 0 0 1-4-4c0-2.3 2-3.4 2.7-5.6 1 1.1 1.3 2.4 1.3 2.4s.6-1.4 1.6-2.6C15 13.5 16 15.4 16 18a4 4 0 0 1-4 4z"/></svg>
+      </div>
+      <div>
+        <h1>US Wildfires 2005–2020</h1>
+        <p>Burned-area heatmaps (MTBS) and vegetation change (MODIS NDVI)</p>
+      </div>
+    </div>
+    <nav class="header-links" aria-label="Project links">
+      <a href="#ndvi">NDVI</a>
+      <a href="#findings">Findings</a>
+      <a href="docs/report.pdf" target="_blank" rel="noopener">Report (PDF)</a>
+      <a href="https://github.com/arbab-boby/us-wildfires-web-gis" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <div class="map-grid">
+      <aside class="panel sidebar" aria-label="Map controls">
+        <div>
+          <p class="eyebrow">Year</p>
+          <div class="year-row">
+            <div class="segmented" role="group" aria-label="Select year" id="yearButtons"></div>
+            <button class="icon-btn" id="playBtn" aria-pressed="false" title="Play through the years" aria-label="Play through the years">
+              <svg id="playIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <p class="eyebrow">Selected year</p>
+          <div class="kpis">
+            <div class="kpi"><div class="label">Fires mapped</div><div class="value" id="kFires">–</div></div>
+            <div class="kpi"><div class="label">Area burned</div><div class="value"><span id="kAcres">–</span> <span class="unit">M acres</span></div></div>
+            <div class="kpi"><div class="label">Largest fire</div><div class="value"><span id="kMax">–</span> <span class="unit">k ac</span></div></div>
+            <div class="kpi"><div class="label">Median fire</div><div class="value"><span id="kMed">–</span> <span class="unit">acres</span></div></div>
+          </div>
+        </div>
+
+        <div>
+          <p class="eyebrow">Fire type</p>
+          <div class="stack" id="typeStack"></div>
+          <ul class="types" id="typeList"></ul>
+        </div>
+
+        <div>
+          <p class="eyebrow">Area burned by year (M acres)</p>
+          <div class="trend" id="trend"></div>
+        </div>
+
+        <div>
+          <div class="toggle">
+            <span>Show individual fires</span>
+            <label class="switch"><input type="checkbox" id="pointsToggle" aria-label="Show individual fires" /><span class="track"></span></label>
+          </div>
+          <p class="note" style="margin-top:6px">Circles are sized by area burned. Click one for details.</p>
+        </div>
+
+        <p class="note">Heat intensity is weighted by acres burned (log scale), on the same scale for every year, so years can be compared directly.</p>
+      </aside>
+
+      <div class="panel map-wrap">
+        <div id="map" role="region" aria-label="Wildfire heatmap"></div>
+        <div class="map-badge" id="mapBadge">2005</div>
+      </div>
+    </div>
+
+    <section class="block" id="ndvi">
+      <div class="section-head">
+        <div>
+          <h2>Vegetation (NDVI) through the year</h2>
+          <p>Distribution of 16-day MODIS NDVI (500 m) at the fire locations. Vegetation greens up from mid-March, peaks in June–August and declines into winter, the same pattern in every year studied.</p>
+        </div>
+        <div class="segmented ndvi-tabs" role="group" aria-label="NDVI year" id="ndviTabs"></div>
+      </div>
+      <div class="panel ndvi-card">
+        <figure class="ndvi-figure">
+          <img id="ndviImg" src="ndvi/2005.png" alt="Box plots of 16-day NDVI by month for 2005" width="1142" height="476" />
+          <figcaption id="ndviCap">Box plots of 16-day NDVI values for 2005. Source: NASA AppEEARS.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="findings">
+      <div class="section-head"><div><h2>Key findings</h2></div></div>
+      <div class="findings">
+        <div class="panel finding">
+          <div class="num">1</div>
+          <h3>Hotspots repeat</h3>
+          <p>Fires cluster in the same regions across 2005–2020, especially Alaska and the southwest US, which points to local climate as a main driver.</p>
+        </div>
+        <div class="panel finding">
+          <div class="num">2</div>
+          <h3>Seasonal vegetation cycle</h3>
+          <p>NDVI rises from mid-March to mid-July and falls afterwards in every year, so the fire season overlaps the period when vegetation starts to dry.</p>
+        </div>
+        <div class="panel finding">
+          <div class="num">3</div>
+          <h3>Three methods, one dataset</h3>
+          <p>The same data was mapped in QGIS, Leaflet + GeoJSON (this page) and GeoServer WMS. Differences between the maps come from radius, cell size and opacity settings.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>Data: <a href="https://data.fs.usda.gov/geodata/edw/datasets.php?xmlKeyword=Monitoring+Trends+in+Burn+Severity" target="_blank" rel="noopener">MTBS, USDA Forest Service</a> · <a href="https://appeears.earthdatacloud.nasa.gov/" target="_blank" rel="noopener">NASA AppEEARS</a> · Basemaps © Esri, © OpenStreetMap contributors</p>
+      <p>Web GIS semester project · Muhammad Arbab Tahir · Institute of Space Technology, 2023</p>
+    </footer>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script/heatmap.js"></script>
+  <script src="script/leaflet-heatmap.js"></script>
+  <script src="wildfires_data/2005forest.js"></script>
+  <script src="wildfires_data/2010forest.js"></script>
+  <script src="wildfires_data/2015forest.js"></script>
+  <script src="wildfires_data/2020forest.js"></script>
+
+  <script>
+    (function () {
+      var YEARS = [2005, 2010, 2015, 2020];
+      var RAW = { 2005: forest2005, 2010: forest2010, 2015: forest2015, 2020: forest2020 };
+      var TYPES = [
+        { key: "Wildfire", color: "#e8590c" },
+        { key: "Prescribed Fire", color: "#2f80c2" },
+        { key: "Wildland Fire Use", color: "#8a5cc2" },
+        { key: "Unknown", color: "#9aa3af" }
+      ];
+      var MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+      function fmt(n, d) {
+        return n.toLocaleString("en-US", { maximumFractionDigits: d || 0, minimumFractionDigits: d || 0 });
+      }
+      // log weighting so a handful of megafires don't wash out every other hotspot
+      function weight(acres) { return Math.log10(Math.max(acres, 1)); }
+
+      // Flatten each year once
+      var DATA = {};
+      var globalMax = 0;
+      YEARS.forEach(function (y) {
+        DATA[y] = RAW[y].features.map(function (f) {
+          var p = f.properties;
+          var w = weight(p.ACRES);
+          if (w > globalMax) globalMax = w;
+          return { lat: p.LATITUDE, lng: p.LONGITUDE, acres: p.ACRES, type: p.FIRE_TYPE, date: p.IG_DATE, id: p.MAP_ID, w: w };
+        });
+      });
+
+      var state = { year: 2005, types: {} };
+      TYPES.forEach(function (t) { state.types[t.key] = true; });
+
+      // ---------- Map ----------
+      var map = L.map("map", {
+        minZoom: 2,
+        maxZoom: 12,
+        maxBounds: [[0, -200], [80, -30]],
+        maxBoundsViscosity: 0.8,
+        zoomControl: false
+      });
+      // continental US, Alaska, Hawaii and Puerto Rico
+      var US_BOUNDS = [[17, -168], [70, -64]];
+      map.fitBounds(US_BOUNDS);
+      L.control.zoom({ position: "topright" }).addTo(map);
+      L.control.scale({ position: "bottomright" }).addTo(map);
+
+      var esri = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+      var bases = {
+        "Dark": L.layerGroup([
+          L.tileLayer(esri + "Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", { attribution: "Basemap &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors", maxZoom: 16 }),
+          L.tileLayer(esri + "Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16, pane: "shadowPane" })
+        ]),
+        "Light": L.layerGroup([
+          L.tileLayer(esri + "Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", { attribution: "Basemap &copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors", maxZoom: 16 }),
+          L.tileLayer(esri + "Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 16, pane: "shadowPane" })
+        ]),
+        "Satellite": L.tileLayer(esri + "World_Imagery/MapServer/tile/{z}/{y}/{x}", { attribution: "Imagery &copy; Esri, Maxar, Earthstar Geographics", maxZoom: 18 })
+      };
+      bases.Dark.addTo(map);
+
+      var heat = new HeatmapOverlay({
+        radius: 16,
+        maxOpacity: 0.8,
+        minOpacity: 0,
+        blur: 0.85,
+        scaleRadius: false,
+        useLocalExtrema: false,
+        latField: "lat",
+        lngField: "lng",
+        valueField: "w"
+      });
+      heat.addTo(map);
+
+      // keep hotspots readable: smaller kernels when zoomed far out
+      function heatRadius() {
+        var z = map.getZoom();
+        heat.cfg.radius = z <= 2 ? 8 : z === 3 ? 14 : 18;
+      }
+      map.on("zoomend", heatRadius);
+      heatRadius();
+
+      var pointsLayer = L.layerGroup();
+      L.control.layers(bases, { "Heatmap": heat, "Individual fires": pointsLayer }, { position: "topright" }).addTo(map);
+
+      var legend = L.control({ position: "bottomleft" });
+      legend.onAdd = function () {
+        var div = L.DomUtil.create("div", "legend");
+        div.innerHTML = "<strong>Burned-area density</strong><div class='ramp'></div><div class='ends'><span>Low</span><span>High</span></div>";
+        return div;
+      };
+      legend.addTo(map);
+
+      function prettyDate(s) {
+        var p = (s || "").split("/"); // dd/mm/yy
+        if (p.length !== 3) return s || "–";
+        return +p[0] + " " + MONTHS[+p[1] - 1] + " 20" + p[2];
+      }
+      function typeColor(t) {
+        for (var i = 0; i < TYPES.length; i++) if (TYPES[i].key === t) return TYPES[i].color;
+        return "#9aa3af";
+      }
+      function filtered(y) {
+        return DATA[y].filter(function (d) { return state.types[d.type]; });
+      }
+      function median(arr) {
+        if (!arr.length) return 0;
+        var s = arr.slice().sort(function (a, b) { return a - b; });
+        var m = Math.floor(s.length / 2);
+        return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+      }
+
+      function renderMap() {
+        var rows = filtered(state.year);
+        heat.setData({ max: globalMax * 3, min: 0, data: rows });
+
+        pointsLayer.clearLayers();
+        // largest first so small fires stay clickable on top
+        rows.slice().sort(function (a, b) { return b.acres - a.acres; }).forEach(function (d) {
+          L.circleMarker([d.lat, d.lng], {
+            radius: Math.max(2.5, Math.sqrt(d.acres) / 40),
+            color: "#fff", weight: 0.8, opacity: 0.9,
+            fillColor: typeColor(d.type), fillOpacity: 0.75
+          }).bindPopup(
+            "<b>" + d.type + "</b><br>" +
+            "Ignition: " + prettyDate(d.date) + "<br>" +
+            "Area burned: <b>" + fmt(d.acres) + "</b> acres<br>" +
+            "<span style='color:#7a8494'>MTBS map ID " + d.id + "</span>"
+          ).addTo(pointsLayer);
+        });
+
+        document.getElementById("mapBadge").textContent = state.year + " · " + fmt(rows.length) + " fires";
+      }
+
+      function renderStats() {
+        var rows = filtered(state.year);
+        var acres = rows.map(function (d) { return d.acres; });
+        var total = acres.reduce(function (a, b) { return a + b; }, 0);
+        document.getElementById("kFires").textContent = fmt(rows.length);
+        document.getElementById("kAcres").textContent = fmt(total / 1e6, 2);
+        document.getElementById("kMax").textContent = rows.length ? fmt(Math.max.apply(null, acres) / 1000) : "0";
+        document.getElementById("kMed").textContent = fmt(median(acres));
+
+        // fire type breakdown (whole year, so the filter checkboxes stay visible)
+        var all = DATA[state.year];
+        var stack = document.getElementById("typeStack");
+        var list = document.getElementById("typeList");
+        stack.innerHTML = "";
+        list.innerHTML = "";
+        TYPES.forEach(function (t) {
+          var n = all.filter(function (d) { return d.type === t.key; }).length;
+          var seg = document.createElement("span");
+          seg.style.width = (n / all.length * 100) + "%";
+          seg.style.background = t.color;
+          seg.style.opacity = state.types[t.key] ? 1 : 0.25;
+          seg.title = t.key + ": " + n;
+          stack.appendChild(seg);
+
+          var li = document.createElement("li");
+          li.innerHTML =
+            "<label><input type='checkbox' " + (state.types[t.key] ? "checked" : "") + (n ? "" : " disabled") + ">" +
+            "<span class='swatch' style='background:" + t.color + "'></span>" + t.key + "</label>" +
+            "<span class='n'>" + fmt(n) + "</span>";
+          li.querySelector("input").addEventListener("change", function (e) {
+            state.types[t.key] = e.target.checked;
+            render();
+          });
+          list.appendChild(li);
+        });
+
+        // area burned per year, respecting the type filter
+        var totals = YEARS.map(function (y) {
+          return filtered(y).reduce(function (a, d) { return a + d.acres; }, 0);
+        });
+        var maxT = Math.max.apply(null, totals) || 1;
+        var trend = document.getElementById("trend");
+        trend.innerHTML = "";
+        YEARS.forEach(function (y, i) {
+          var col = document.createElement("div");
+          col.className = "bar-col" + (y === state.year ? " active" : "");
+          col.title = y + ": " + fmt(totals[i]) + " acres";
+          col.innerHTML =
+            "<span class='bar-val'>" + fmt(totals[i] / 1e6, 1) + "</span>" +
+            "<div class='bar' style='height:" + Math.max(2, totals[i] / maxT * 56) + "px'></div>" +
+            "<span class='bar-yr'>" + y + "</span>";
+          col.addEventListener("click", function () { stopPlay(); setYear(y); });
+          trend.appendChild(col);
+        });
+      }
+
+      function render() { renderMap(); renderStats(); }
+
+      // ---------- Year controls ----------
+      var yearWrap = document.getElementById("yearButtons");
+      YEARS.forEach(function (y) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = y;
+        b.dataset.year = y;
+        b.addEventListener("click", function () { stopPlay(); setYear(y); });
+        yearWrap.appendChild(b);
+      });
+
+      function setYear(y) {
+        state.year = y;
+        yearWrap.querySelectorAll("button").forEach(function (b) {
+          b.setAttribute("aria-pressed", String(+b.dataset.year === y));
+        });
+        render();
+      }
+
+      var playTimer = null;
+      var playBtn = document.getElementById("playBtn");
+      var playIcon = document.getElementById("playIcon");
+      function stopPlay() {
+        if (!playTimer) return;
+        clearInterval(playTimer);
+        playTimer = null;
+        playBtn.setAttribute("aria-pressed", "false");
+        playIcon.innerHTML = '<path d="M7 4.5v15l12-7.5z"/>';
+      }
+      playBtn.addEventListener("click", function () {
+        if (playTimer) { stopPlay(); return; }
+        playBtn.setAttribute("aria-pressed", "true");
+        playIcon.innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+        var step = function () { setYear(YEARS[(YEARS.indexOf(state.year) + 1) % YEARS.length]); };
+        step();
+        playTimer = setInterval(step, 1800);
+      });
+
+      var pointsToggle = document.getElementById("pointsToggle");
+      pointsToggle.addEventListener("change", function () {
+        if (pointsToggle.checked) pointsLayer.addTo(map); else map.removeLayer(pointsLayer);
+      });
+      map.on("overlayadd overlayremove", function (e) {
+        if (e.layer === pointsLayer) pointsToggle.checked = e.type === "overlayadd";
+      });
+
+      // ---------- NDVI tabs ----------
+      var ndviTabs = document.getElementById("ndviTabs");
+      YEARS.forEach(function (y) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = y;
+        b.setAttribute("aria-pressed", String(y === 2005));
+        b.addEventListener("click", function () {
+          ndviTabs.querySelectorAll("button").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+          var img = document.getElementById("ndviImg");
+          img.src = "ndvi/" + y + ".png";
+          img.alt = "Box plots of 16-day NDVI by month for " + y;
+          document.getElementById("ndviCap").textContent = "Box plots of 16-day NDVI values for " + y + ". Source: NASA AppEEARS.";
+        });
+        ndviTabs.appendChild(b);
+      });
+
+      setYear(2005);
+      // the map box is sized by CSS grid; let Leaflet pick up its final size
+      setTimeout(function () { map.invalidateSize(); map.fitBounds(US_BOUNDS); }, 100);
+    })();
+  </script>
+</body>
+</html>

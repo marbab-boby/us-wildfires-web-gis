@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="icon" type="image/x-icon" href="favicon/fire.png">
+    <!-- leaflet css link  -->
+	<link
+      rel="stylesheet"
+      href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+
+   
+    <title>Wildfires in US</title>
+
+    <!-- leaflet js link  -->
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+
+ <!-- leaflet slider link -->
+ <link rel="stylesheet" href="leaflet-slider.css" />
+ <script src="leaflet-slider.js"></script>
+
+<!-- jquery link  -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+<!-- leaflet geoserver request link  -->
+<script src="lib/L.Geoserver.js"></script>
+
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
+	   body {
+        font-family: sans-serif;
+      }
+	  body * {
+        font-weight: 200;
+      }
+	  .heading{
+		font:40px Arial;
+		text-align: center;
+		color: black;
+		border-color: rgb(255, 145, 0);
+	}
+      #map {
+        height: 500px;
+		width:  90%;
+		border : dotted;
+		margin-right: auto;
+	   margin-left: auto;
+	   margin-bottom: auto;
+      }
+	  .tab {
+            display: inline-block;
+            margin-left: 40%;
+        }
+    </style>
+  </head>
+  <body>
+        <div class="heading" id="heading">Heatmap of Wildfires in US</div>
+
+		<div id="map"></div>
+		
+		<div class="information">
+			<p class="tab1"><span class="tab"></span>The Wildfire data is taken from <a href="https://data.fs.usda.gov/geodata/edw/datasets.php?xmlKeyword=Monitoring+Trends+in+Burn+Severity">USDA Forest Service</a></p>
+			 
+			 
+		 </div>	
+  </body>
+</html>
+
+
+
+<script>
+  var map = L.map("map").setView([45.6586, -130.3568], 2);
+
+  var osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17,
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  });
+
+  osm.addTo(map);
+
+	var a = [
+  "US_Heatmaps:2005",
+  "US_Heatmaps:2010",
+  "US_Heatmaps:2015",
+  "US_Heatmaps:2020",
+];
+
+	 slider = L.control
+          .slider(
+            function (value) {
+              update((value - 2005) / 5);
+            },
+            {
+              max: 2020,
+              min: 2005,
+              value: 2005,
+              step: 5,
+              size: "250px",
+              orientation: "horizontal",
+              id: "slider",
+			  logo : "Year",
+            }
+          )
+          .addTo(map);
+		  
+		  
+  // wms request
+  
+  function update(sliderIndex) {
+  
+  var wmsLayer = L.Geoserver.wms("http://localhost:8080/geoserver/wms", {
+    layers:  a[sliderIndex],
+  });
+  //removing the previous layer
+  if (map.hasLayer(wmsLayer)) {
+    map.removeLayer(wmsLayer);
+  }
+  
+  
+  
+   
+  map.eachLayer(function (wmsLayer) {
+  map.removeLayer(wmsLayer);
+});
+
+ osm.addTo(map);
+
+  wmsLayer.addTo(map);
+}
+
+var layerLegend = L.Geoserver.legend("http://localhost:8080/geoserver/wms", {
+  layers: "US_Heatmaps:2020" ,
+  title:("Legend"),
+  label:["Legend"],
+});
+
+layerLegend.addTo(map);
+</script>
