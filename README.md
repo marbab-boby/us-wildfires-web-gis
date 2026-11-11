@@ -8,7 +8,7 @@ by **GeoServer**.
 Semester project for *Web GIS*, BS Space Science, Institute of Space Technology (2023).
 By **Muhammad Arbab Tahir**.
 
-**[Open the live map](https://arbab-boby.github.io/us-wildfires-web-gis/)** · 📄 [Project report (PDF)](docs/report.pdf)
+**[Open the live map](https://marbab-boby.github.io/us-wildfires-web-gis/)** · 📄 [Project report (PDF)](docs/report.pdf)
 
 ![Web map with wildfire heatmap and NDVI charts](images/web-map.png)
 
